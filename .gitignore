@@ -85,3 +85,4 @@ input/
 run.sh
 
 env/
+venv/
