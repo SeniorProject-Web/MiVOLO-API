@@ -6,7 +6,7 @@ from django.core.files.uploadedfile import UploadedFile
 from django.http.multipartparser import MultiPartParser
 
 import json     
-from django.http import JsonResponse, HttpResponseBadRequest
+from django.http import JsonResponse
 from .models import createCustomerServiceModel as Customers
 from .models import elementCustomerServiceModel as elementCustomer
 from imagePredict import getImgtoModel
@@ -51,193 +51,192 @@ def load_model():
     
     predictor = Predictor(config, verbose=True)
 
-# load model
+# load model mivolo
 load_model()
 
 @api_view(['GET', 'POST'])
 
 # Create your views here.
 
-def api_home(request, *args, **kwargs):
-    customerData = Customers.objects.all().order_by("?").first()
-    data = {}
-    if customerData:
-        data = {
-            "id": customerData.id,
-            "top": customerData.top,
-            "pant": customerData.pant,
-            "time": customerData.time,
-            "owner": customerData.owner,
-            "location": customerData.location,
-        }
-    else: 
-        return JsonResponse({"error": "No data found"})
-    return JsonResponse({"customer": data})
-
-def firebaseTest(request):
-    channel_customerId = db.child("Customer").child("Id").get().val()
-    channel_top = db.child("Customer").child("top").get().val()
-    channel_pant = db.child("Customer").child("pant").get().val()
-    channel_time = db.child("Customer").child("time").get().val()
-    channel_owner = db.child("Customer").child("owner").get().val()
-    channel_location = db.child("Customer").child("location").get().val()
-    
-    data = {
-        "id": channel_customerId,
-        "top": channel_top,
-        "pant": channel_pant,
-        "time": channel_time,
-        "owner": channel_owner,
-        "location": channel_location
-    }
-    return JsonResponse({"customer": data})
-
-def firebaseCustomerAdd(request):
-    data = {
-        "top": "t-shirt",
-        "pant": "trouser",
-        "time": "2021-07-20",
-        "owner": "beambike2@gmail.com",
-        "location": "KMUTT"
-    }
-    db.child("Customer").push(data)
-    return JsonResponse({"message": "Data added"})
-
-def getCustomerData(request):
-    allData = db.child("Customer").get().val()
-    return JsonResponse(allData)
-
-def getCustomer(request):
-    customerData = elementCustomer.objects.all().values()
-    if customerData:
-        return JsonResponse({"customer": list(customerData)})
-    else:
-        return JsonResponse({"error": "No data found"})
-
-@csrf_exempt
-def addCustomer(request): # get api from camera 
-    if request.method == 'POST':
-        
-        try: 
-            CustomerList = json.loads(request.body)
-            if CustomerList["data"]:
-                for customer in CustomerList["data"]:
-                    if customer["image"]:
-                        # send to mivolo model to predict ang and gender
-                        prediction = getImgtoModel(customer["image"])
-                        customerData = {
-                            "image": customer["image"],
-                            "dress": customer["dress"],
-                            "tShirt": customer["t-shirt"],
-                            "jacket": customer["jacket"] ,
-                            "top": customer["top"],
-                            "longSleeve" : customer["long-sleeve"],
-                            "short": customer["short"],
-                            "skirt": customer["skirt"],
-                            "trouser": customer["trouser"],
-                            "location": customer["location"],
-                            "time": customer["time"]
-                        }
-                    
-                    elementCustomer.objects.create(**customerData)
-                    
-                # return JsonResponse({"message": "Customer added!"})
-                return JsonResponse({"predictd": prediction})
-                    
-            else:
-                return JsonResponse({"error": "No data found"})
-                
-            
-        except Exception as e:
-            return JsonResponse({"error": str(e)})
-            
 @csrf_exempt            
-def predictCustomer(request):
-    if request.method == 'POST':
-        
-        ONLY_TOPS = ["dress","t-shirt","jacket","top","long-sleeve"]
-        ONLY_BOTTOMS = ["short","skirt","trouser"]
-        
-        requestHeader = request.headers.get("Authorization")
-        if not requestHeader:
+def customerTest(request):
+    
+    ONLY_TOPS = ["dress","t-shirt","jacket","top","long-sleeve"]
+    ONLY_BOTTOMS = ["short","skirt","trouser"]
+    
+    try:
+        if request.method == "POST":  
+            requestHeader = request.headers.get("accessToken") # get token from header
             
-            return JsonResponse({"error": "No token found"})
-        
-        else:
-            print(requestHeader)
-            payload = jwt.decode(requestHeader, ACCESS_TOKEN_SECRET, algorithms=["HS256"])
-            owner = payload["email"]
+            if requestHeader:
+                payload = jwt.decode(requestHeader, ACCESS_TOKEN_SECRET, algorithms=["HS256"])
+                owner = payload["email"]
+            else:
+                return JsonResponse({"message": "missing token in customerFeature"}, status=401)
+            
+            if request.FILES.get("data") is None:
+                return JsonResponse({"message": "No data found"}, status=400)
 
-            recieveJson = False
-            recieveImage = False
+            jsonRecieves = request.FILES["data"] # get data.json with list customer data            
+            CustomerList = json.loads(jsonRecieves.read())
             
-            if 'customerDetail' in request.FILES and isinstance(request.FILES['customerDetail'], UploadedFile):
-                jsonRecieves = request.FILES["customerDetail"]
-                CustomerList = json.loads(jsonRecieves.read())
-                recieveJson = True    
-                            
-                if request.FILES.getlist("customerImage"):
-                    imageRecieves = request.FILES.getlist("customerImage")
-                    recieveImage = True
-                    
-            if recieveJson and recieveImage:
-                results = []
+            if CustomerList["data"]:
                 for customer in CustomerList["data"]:
                     maxTop = 0
                     maxBottom = 0
+                    targetId = customer["img-name"].split(".jpg")[0] # {trackId}.jpg
                     
-                    for topEntitie in ONLY_TOPS:
-                        if customer[topEntitie] > maxTop:
-                            maxTop = customer[topEntitie]
-                            finalTop = topEntitie
+                    finalTop = None
+                    finalBottom = None
+                    customerAge = 0
+                    customerGender = None
+                    customerData = {}
                         
-                    if finalTop == "dress":
-                        finalBottom = "None"
-                    else:                            
-                        for bottomEntitie in ONLY_BOTTOMS:
-                            if customer[bottomEntitie] > maxBottom:
-                                maxBottom = customer[bottomEntitie]
-                                finalBottom = bottomEntitie 
-                                
-                    for image in imageRecieves:
-                        if image.name == f"{customer['image_file']}.jpg":
-                            img = PIL.Image.open(image)
-                            img_rgb = img.convert("RGB")
-                            img_array = np.array(img_rgb)
-                        
-                            prediction, _ = predictor.recognize(img_array)
-                            customerAge = int(prediction.ages[0])
-                            customerGender = prediction.genders[0]    
-                            
-                    if(customerAge >= 15 and customerAge <= 29):
-                        customerAge = "15-29"
-                    elif(customerAge >= 30 and customerAge <= 59):
-                        customerAge = "30-59"
-                    elif(customerAge >= 60):
-                        customerAge = "60up"
+                    for topEntity in ONLY_TOPS:
+                        if customer[topEntity] > maxTop:
+                            maxTop = customer[topEntity]
+                            finalTop = topEntity
+                    if maxTop == 0:
+                        finalTop = None
 
-                    customerData = {
+                    if finalTop == "dress": # if top is dress, bottom is none
+                        finalBottom = "-"
+                    else:                            
+                        for bottomEntity in ONLY_BOTTOMS:
+                            if customer[bottomEntity] > maxBottom:
+                                maxBottom = customer[bottomEntity]
+                                finalBottom = bottomEntity
+                        if maxBottom == 0:
+                            finalBottom = None
+                        
+                    print(f"target {targetId} ===> finalTop: {finalTop}, finalBottom: {finalBottom}")
+                    
+                    if finalTop is None or finalBottom is None: # if top or bottom is none
+                        # return JsonResponse({"error": f"top or bottom is none in {targetId}", "message": f"top or bottom is none in {targetId}"}, status=402)
+                        print(f"top or bottom is none in {targetId}")
+                        continue
+                                
+                    targetImage = request.FILES.get(f"image_{targetId}", None) # get image from customer track id
+                    
+                    if targetImage is not None: # send image to mivolo model to predict age/gender
+                        img = PIL.Image.open(targetImage)
+                        img_rgb = img.convert("RGB")
+                        img_array = np.array(img_rgb)
+                        prediction,_ = predictor.recognize(img_array)
+                        
+                        print(f"feature track number {targetId} : \n")
+                        print(f"face_count: {prediction.n_faces}, person_count: {prediction.n_persons}")
+                        
+                        if(prediction.n_faces == 0 and prediction.n_persons == 0):
+                            continue
+                        customerAge = int(prediction.ages[0])
+                        customerGender = prediction.genders[0]
+                        
+                        if(customerAge >= 15 and customerAge <= 29):
+                            customerAge = "15-29"
+                        elif(customerAge >= 30 and customerAge <= 59):
+                            customerAge = "30-59"
+                        elif(customerAge >= 60):
+                            customerAge = "60up"
+                            
+                        customerData = {
+                            "gender": customerGender,
+                            "age": customerAge,
+                            "location": customer["location"],
+                            "owner": owner,
+                            "lowerPart": finalBottom,
+                            "time": customer["time"],
+                            "upperPart" : finalTop
+                        }
+                        
+                        doc_ref = db.collection(u'customers').document()
+                        doc_ref.set(customerData)
+                    else:
+                        print(f"No image in {targetId} found")
+                        continue  
+                    
+                return JsonResponse({"message":"customerFeature Done"}, status=200)
+
+            else:
+                print("No key argument => data <= found")
+                return JsonResponse({"message":"No key argument => data <= found"}, status=400) 
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+    
+@csrf_exempt
+def customerAttention(request):
+    try:
+        
+        if request.method == "POST":  
+            requestHeader = request.headers.get("accessToken") # get token from header
+            
+            if requestHeader:
+                payload = jwt.decode(requestHeader, ACCESS_TOKEN_SECRET, algorithms=["HS256"])
+                owner = payload["email"]
+            else:
+                return JsonResponse({"message": "missing token in customerFeature"}, status=401)
+            
+            if request.FILES.get("data") is None:
+                print("No data found")
+                return JsonResponse({"message": "No data found"}, status=400)
+            
+            jsonRecieves = request.FILES["data"] # get data.json with list customer data
+            AttentionList = json.loads(jsonRecieves.read())
+            
+            if AttentionList["data"]:
+                for cusAttention in AttentionList["data"]:
+                    customerAge = 0
+                    customerGender = None
+                    attentionData = {}
+                    
+                    targetId = cusAttention["img-name"].split(".jpg")[0]
+                    look_status = cusAttention["look_status"]
+                    targetImage = request.FILES.get(f"image_{targetId}", None)
+                    
+                    if targetImage is not None:
+                        img = PIL.Image.open(targetImage)
+                        img_rgb = img.convert("RGB")
+                        img_array = np.array(img_rgb)
+                        prediction,_ = predictor.recognize(img_array)
+
+                        if(prediction.n_faces == 0 and prediction.n_persons == 0):
+                            continue
+                        
+                        customerAge = int(prediction.ages[0])
+                        customerGender = prediction.genders[0]
+                        
+                        print(f"attention track number {targetId} : \n")
+                        print(f"face_count: {prediction.n_faces}, person_count: {prediction.n_persons}")
+                        
+                        if(customerAge >= 15 and customerAge <= 29):
+                            customerAge = "15-29"
+                        elif(customerAge >= 30 and customerAge <= 59):
+                            customerAge = "30-59"
+                        elif(customerAge >= 60):
+                            customerAge = "60up"
+                            
+                    else:
+                        # return JsonResponse({"error": f"No image in {targetId} found", "message": f"No image in {targetId} found"}, status=400)
+                        print(f"No image in {targetId} found")
+                        continue
+                    
+                    attentionData = {
                         "gender": customerGender,
                         "age": customerAge,
-                        "location": customer["location"],
+                        "location": cusAttention["location"],
                         "owner": owner,
-                        "pant": finalBottom,
-                        "time": customer["time"],
-                        "top" : finalTop
+                        "time": cusAttention["time"],
+                        "look_status" : look_status
                     }
                     
-                    # send to firestore
-                    doc_ref = db.collection(u'customers').document()
-                    doc_ref.set(customerData)
-
-                    # results.append(customerData)
-                return JsonResponse({"msg": "Done"})          
-                                
-            elif recieveJson and not recieveImage:
-                return HttpResponseBadRequest({"msg": "Only data received!"})       
-            elif not recieveJson and recieveImage:
-                return HttpResponseBadRequest({"msg": len(imageRecieves)})     
+                    doc_ref = db.collection(u'attention').document()
+                    doc_ref.set(attentionData)
+                    
+                return JsonResponse({"message": "customerAttention Done"}, status=200)
             else:
-                return HttpResponseBadRequest({"msg": "No data received!"})
-    else:    
-        return HttpResponseBadRequest("dont faking know what you want")
+                print("No key argument => data <= found")
+                return JsonResponse({"message":"No key argument => data <= found"}, status=400) 
+    
+    except Exception as e:
+        print(e)
+        return JsonResponse({"error": str(e)}, status=400)  

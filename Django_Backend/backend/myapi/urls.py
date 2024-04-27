@@ -1,7 +1,7 @@
 from django.urls import path
-from .views import getCustomer, predictCustomer
+from .views import customerAttention, customerTest
 
 urlpatterns = [
-    path("getCustomer/", getCustomer), # http://127.0.0.1:8000/api/getCustomer/
-    path("recieveCustomer/", predictCustomer), # http://127.0.0.1:8000/api/recieveCustomer/
+    path("recieveCustomer/", customerTest), # http://127.0.0.1:8000/api/recieveCustomer/
+    path("recieveAttention/", customerAttention), # http://127.0.0.1:8000/api/recieveCustomer/
 ]
