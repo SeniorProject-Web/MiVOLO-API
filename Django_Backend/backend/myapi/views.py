@@ -28,6 +28,7 @@ import torch
 import firebase_admin
 from firebase_admin import firestore
 import jwt
+import csv
 
 import random
 
@@ -62,6 +63,16 @@ def load_model():
 # load model mivolo
 load_model()
 
+def save_to_csv(data): # save to csv file
+    headers = data.keys()
+    values = data.values()
+    
+    with open('output.csv', mode='a', newline='') as file:
+        writer = csv.writer(file)
+        if file.tell() == 0: # write header only index 0,1,4,6
+            writer.writerow(headers)
+        writer.writerow(values)
+
 @api_view(['GET', 'POST'])
 
 # Create your views here.
@@ -83,7 +94,7 @@ def customerTest(request):
                 return JsonResponse({"message": "missing token in customerFeature"}, status=401)
             
             if request.FILES.get("data") is None:
-                return JsonResponse({"message": "No data found"}, status=400)
+                return JsonResponse({"message": "No data found"}, status=400) # check file is defined with ketword "data"
 
             jsonRecieves = request.FILES["data"] # get data.json with list customer data            
             CustomerList = json.loads(jsonRecieves.read())
@@ -117,26 +128,27 @@ def customerTest(request):
                         if maxBottom == 0:
                             finalBottom = None
                         
-                    print(f"target {targetId} ===> finalTop: {finalTop}, finalBottom: {finalBottom}")
                     
                     if finalTop is None or finalBottom is None: # if top or bottom is none
-                        # return JsonResponse({"error": f"top or bottom is none in {targetId}", "message": f"top or bottom is none in {targetId}"}, status=402)
-                        print(f"top or bottom is none in {targetId}")
                         continue
                                 
                     targetImage = request.FILES.get(f"image_{targetId}", None) # get image from customer track id
                     
                     if targetImage is not None: # send image to mivolo model to predict age/gender
+                        
+                        print(f"feature track number {targetId} : \n")
                         img = PIL.Image.open(targetImage)
                         img_rgb = img.convert("RGB")
                         img_array = np.array(img_rgb)
                         prediction,_ = predictor.recognize(img_array)
                         
-                        print(f"feature track number {targetId} : \n")
                         print(f"face_count: {prediction.n_faces}, person_count: {prediction.n_persons}")
                         
                         if(prediction.n_faces == 0 and prediction.n_persons == 0):
                             continue
+                        if(prediction.n_faces == 0):
+                            continue
+                        
                         customerAge = int(prediction.ages[0])
                         customerGender = prediction.genders[0]
                         
@@ -157,8 +169,12 @@ def customerTest(request):
                             "upperPart" : finalTop
                         }
                         
+                        # save to output.csv
+                        # save_to_csv(customerData)
+                        
                         doc_ref = db.collection(u'customers').document()
                         doc_ref.set(customerData)
+                        
                     else:
                         print(f"No image in {targetId} found")
                         continue  
@@ -166,10 +182,10 @@ def customerTest(request):
                 return JsonResponse({"message":"customerFeature Done"}, status=200)
 
             else:
-                print("No key argument => data <= found")
-                return JsonResponse({"message":"No key argument => data <= found"}, status=400) 
+                return JsonResponse({"message":"No key argument => data <= found"}, status=402) 
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=400)
+        print(e)
+        return JsonResponse({"error": str(e)}, status=404)
     
 @csrf_exempt
 def customerAttention(request):
@@ -207,7 +223,7 @@ def customerAttention(request):
                         img_array = np.array(img_rgb)
                         prediction,_ = predictor.recognize(img_array)
 
-                        if(prediction.n_faces == 0 and prediction.n_persons == 0):
+                        if(prediction.n_faces == 0):
                             continue
                         
                         customerAge = int(prediction.ages[0])
@@ -224,7 +240,6 @@ def customerAttention(request):
                             customerAge = "60up"
                             
                     else:
-                        # return JsonResponse({"error": f"No image in {targetId} found", "message": f"No image in {targetId} found"}, status=400)
                         print(f"No image in {targetId} found")
                         continue
                     
@@ -237,8 +252,8 @@ def customerAttention(request):
                         "look_status" : look_status
                     }
                     
-                    doc_ref = db.collection(u'attention').document()
-                    doc_ref.set(attentionData)
+                    # doc_ref = db.collection(u'attention').document()
+                    # doc_ref.set(attentionData)
                     
                 return JsonResponse({"message": "customerAttention Done"}, status=200)
             else:
@@ -249,7 +264,7 @@ def customerAttention(request):
         print(e)
         return JsonResponse({"error": str(e)}, status=400)  
     
-def get_ads(request):
+def getAds(request):
     
     ads_cost_normal = 200
     ads_cost_random = 100
@@ -274,12 +289,12 @@ def get_ads(request):
         if request.method == "GET":
             requestHeader = request.headers.get("accessToken") # get token from header
             
-            # if requestHeader:
-            #     payload = jwt.decode(requestHeader, ACCESS_TOKEN_SECRET, algorithms=["HS256"])
-            #     owner = payload["email"]
-            # else:
-            #     return JsonResponse({"message": "missing token in customerFeature"}, status=401)
-            
+            if requestHeader:
+                payload = jwt.decode(requestHeader, ACCESS_TOKEN_SECRET, algorithms=["HS256"])
+                owner = payload["email"]
+            else:
+                return JsonResponse({"message": "missing token in getAds"}, status=401)
+                
             # TODO: get ads from model
             upperPart = "t-shirt"
             lowerPart = "short"
