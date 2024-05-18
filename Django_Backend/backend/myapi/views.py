@@ -1,6 +1,6 @@
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view
-from .serializers import elementCustomerServiceModelSerializer
+# from .serializers import elementCustomerServiceModelSerializer
 
 from django.core.files.uploadedfile import UploadedFile
 from django.http.multipartparser import MultiPartParser
@@ -11,8 +11,8 @@ from google.cloud.firestore_v1.base_query import BaseCompositeFilter
 
 import json     
 from django.http import JsonResponse
-from .models import createCustomerServiceModel as Customers
-from .models import elementCustomerServiceModel as elementCustomer
+# from .models import createCustomerServiceModel as Customers
+# from .models import elementCustomerServiceModel as elementCustomer
 from imagePredict import getImgtoModel
 import os
 import PIL
