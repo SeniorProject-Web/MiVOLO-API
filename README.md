@@ -11,5 +11,5 @@ python manage.py runserver
 ## Build With Docker
 ```
 docker build -t ai_demographic .
-docker compose -f "docker.compose.yaml" up --scale ai_api=3
+docker compose -f "docker-compose.yml" up --scale ai_api=3
 ```
