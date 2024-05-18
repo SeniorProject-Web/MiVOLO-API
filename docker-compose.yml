@@ -1,0 +1,14 @@
+services:
+  ai_api:
+    image: ai_demographic
+    restart: on-failure
+  
+  nginx:
+    image: nginx:1.25.5-alpine-slim
+    container_name: nginx
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - ai_api

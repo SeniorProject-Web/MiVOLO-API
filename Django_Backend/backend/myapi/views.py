@@ -31,6 +31,8 @@ import jwt
 
 import random
 
+import socket
+
 db = firestore.client()
 
 ACCESS_TOKEN_SECRET= "CxTq8dpnGz8i2yRr9P71XK82E2nFz78B"
@@ -347,3 +349,8 @@ def get_ads(request):
         
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
+
+def health_check(request):
+    socket.gethostname()
+    if request.method == "GET":
+        return JsonResponse({"status": "ok", "host": socket.gethostname()}, status=200)
