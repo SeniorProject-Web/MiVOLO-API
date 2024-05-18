@@ -1,9 +1,9 @@
 import sys
-sys.path.append('D:\\Github\\MiVOLO-API\\')
-sys.path.append('D:\\Github\\MiVOLO-API\\models\\')
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'models')))
 
 import logging
-import os
 
 import PIL
 import torch
