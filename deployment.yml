@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-demographic-deployment
+  labels:
+    app: ai-demographic
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ai-demographic
+  template:
+    metadata:
+      labels:
+        app: ai-demographic
+    spec:
+      containers:
+      - name: ai-demographic
+        image: sawari/ai_demographic:latest
+        resources:
+          requests:
+            cpu: 100m
+          limits:
+            cpu: 1000m
+            memory: 1024Mi
+        ports:
+        - containerPort: 8000

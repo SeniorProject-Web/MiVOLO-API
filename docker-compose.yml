@@ -1,6 +1,6 @@
 services:
   ai_api:
-    image: ai_demographic
+    image: sawari/ai_demographic
     restart: on-failure
   
   nginx:
